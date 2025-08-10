@@ -50,6 +50,8 @@ erDiagram
   users ||--o{ meals        : has
   users ||--o{ exercises    : has
   users ||--o{ diaries      : has
+  users ||--o{ goals        : has
+  goals ||--o{ goal_progress : has
 
   articles o{--o{ tags      : via article_tags
 
@@ -101,6 +103,29 @@ erDiagram
     date date
     time time
     string content
+    datetime created_at
+    datetime updated_at
+  }
+
+  goals {
+    int id PK
+    int user_id FK
+    string title
+    string description
+    float target_value
+    date target_date
+    boolean is_active
+    datetime created_at
+    datetime updated_at
+  }
+
+  goal_progress {
+    int id PK
+    int goal_id FK
+    date date
+    float current_value
+    boolean is_completed
+    string notes
     datetime created_at
     datetime updated_at
   }
@@ -188,9 +213,9 @@ await fetch(presign.url, { method: 'POST', body: fd });
 ## Achievement Rate System
 
 ### Calculation
-- **Formula**: `(days_with_records / total_days) × 100%`
+- **Formula**: `(Total Goals Completed / Total Goals Set) × 100%`
 - **Window**: Configurable (default: 30 days)
-- **Record types**: Body records, meals, exercises, diaries
+- **Goal types**: User-defined health and fitness goals
 - **Cache**: Redis (1 hour TTL)
 
 ### APIs
@@ -199,10 +224,9 @@ await fetch(presign.url, { method: 'POST', body: fd });
 - `POST /stats/achievement-rate/trigger` - Manual calculation trigger
 
 ### Automatic Triggers
-- ✅ When creating new body records
-- ✅ When creating new meals
-- ✅ When creating new exercises  
-- ✅ When creating new diaries
+- ✅ When creating new goal progress
+- ✅ When updating goal progress
+- ✅ When creating new goals
 
 ### Background Tasks
 - **Daily**: `stats.compute_achievement_rate_all_users` (3:00 AM UTC)
@@ -216,6 +240,16 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/stats/achievement-r
 
 # Get specific user with custom window
 curl -H "Authorization: Bearer $TOKEN" "http://localhost:8000/stats/achievement-rate/user/1?window_days=7"
+
+# Create a goal
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"title": "Lose 5kg", "target_value": 65.0, "target_date": "2025-09-09"}' \
+  http://localhost:8000/records/goals
+
+# Create goal progress (triggers achievement rate calculation)
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"date": "2025-08-11", "current_value": 68.5, "is_completed": true}' \
+  http://localhost:8000/records/goals/1/progress
 
 # Trigger calculation for all users
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8000/stats/achievement-rate/trigger

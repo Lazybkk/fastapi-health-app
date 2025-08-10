@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, time, datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
 from app.schemas.enums import MealType
@@ -18,14 +18,84 @@ class BodyRecordCreate(BodyRecordBase):
     pass
 
 
-class BodyRecordRead(BodyRecordBase):
-    id: int
-
-
 class BodyRecordUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: Optional[date] = None
     weight: Optional[float] = None
     body_fat_percentage: Optional[float] = None
+
+
+class BodyRecordRead(BodyRecordBase):
+    id: int
+    user_id: int
+    created_at: str
+    updated_at: str
+
+
+class GoalBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str
+    description: Optional[str] = None
+    target_value: Optional[float] = None
+    target_date: Optional[date] = None
+    is_active: bool = True
+
+
+class GoalCreate(GoalBase):
+    pass
+
+
+class GoalUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    title: Optional[str] = None
+    description: Optional[str] = None
+    target_value: Optional[float] = None
+    target_date: Optional[date] = None
+    is_active: Optional[bool] = None
+
+
+class GoalRead(GoalBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class GoalProgressBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    goal_id: int
+    date: date
+    current_value: Optional[float] = None
+    is_completed: bool = False
+    notes: Optional[str] = None
+
+
+class GoalProgressCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date
+    current_value: Optional[float] = None
+    is_completed: bool = False
+    notes: Optional[str] = None
+
+
+class GoalProgressUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    date: Optional[date] = None
+    current_value: Optional[float] = None
+    is_completed: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class GoalProgressRead(GoalProgressBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class MealBase(BaseModel):
@@ -44,7 +114,7 @@ class MealBase(BaseModel):
             return v
         allowed = {"Morning", "Lunch", "Dinner", "Snack"}
         if v not in allowed:
-            raise ValueError(f"meal_type must be one of {sorted(allowed)}")
+            raise ValueError(f"meal_type must be one of {[m.value for m in sorted(allowed, key=lambda x: x.value)]}")
         return v
 
 
@@ -52,26 +122,21 @@ class MealCreate(MealBase):
     pass
 
 
-class MealRead(MealBase):
-    id: int
-
-
 class MealUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: Optional[date] = None
     meal_type: Optional[MealType] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
     calories: Optional[int] = None
 
-    @field_validator("meal_type")
-    @classmethod
-    def validate_meal_type(cls, v: Optional[MealType]) -> Optional[MealType]:
-        if v is None:
-            return v
-        allowed = {MealType.Morning, MealType.Lunch, MealType.Dinner, MealType.Snack}
-        if v not in allowed:
-            raise ValueError(f"meal_type must be one of {[m.value for m in sorted(allowed, key=lambda x: x.value)]}")
-        return v
+
+class MealRead(MealBase):
+    id: int
+    user_id: int
+    created_at: str
+    updated_at: str
 
 
 class ExerciseBase(BaseModel):
@@ -80,22 +145,27 @@ class ExerciseBase(BaseModel):
     date: date
     name: str
     duration_min: int
-    calories: int | None = None
+    calories: Optional[int] = None
 
 
 class ExerciseCreate(ExerciseBase):
     pass
 
 
-class ExerciseRead(ExerciseBase):
-    id: int
-
-
 class ExerciseUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: Optional[date] = None
     name: Optional[str] = None
     duration_min: Optional[int] = None
     calories: Optional[int] = None
+
+
+class ExerciseRead(ExerciseBase):
+    id: int
+    user_id: int
+    created_at: str
+    updated_at: str
 
 
 class DiaryBase(BaseModel):
@@ -110,13 +180,18 @@ class DiaryCreate(DiaryBase):
     pass
 
 
-class DiaryRead(DiaryBase):
-    id: int
-
-
 class DiaryUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: Optional[date] = None
     time: Optional[time] = None
     content: Optional[str] = None
+
+
+class DiaryRead(DiaryBase):
+    id: int
+    user_id: int
+    created_at: str
+    updated_at: str
 
 

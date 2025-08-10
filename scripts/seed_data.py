@@ -17,6 +17,8 @@ from app.models import (
     Meal,
     Exercise,
     Diary,
+    Goal,
+    GoalProgress,
 )
 
 
@@ -71,6 +73,65 @@ def seed_articles(session: Session) -> None:
         assigned = random.sample(tags, k=random.randint(1, 3))
         for t in assigned:
             ensure_article_tag(session, art.id, t.id)
+
+
+def seed_goals(session: Session, user: User) -> None:
+    """Seed demo goals for the user"""
+    goal_data = [
+        {
+            "title": "Lose 5kg",
+            "description": "Target weight loss goal",
+            "target_value": 65.0,
+            "target_date": date.today() + timedelta(days=30),
+        },
+        {
+            "title": "Exercise 3 times per week",
+            "description": "Regular exercise routine",
+            "target_value": 3.0,
+            "target_date": date.today() + timedelta(days=7),
+        },
+        {
+            "title": "Reduce body fat to 18%",
+            "description": "Body composition goal",
+            "target_value": 18.0,
+            "target_date": date.today() + timedelta(days=60),
+        },
+        {
+            "title": "Eat healthy meals daily",
+            "description": "Nutrition goal",
+            "target_value": 7.0,
+            "target_date": date.today() + timedelta(days=7),
+        },
+    ]
+    
+    goals = []
+    for goal_info in goal_data:
+        goal = Goal(
+            user_id=user.id,
+            **goal_info
+        )
+        session.add(goal)
+        session.flush()
+        goals.append(goal)
+    
+    # Add some progress for goals
+    today = date.today()
+    for goal in goals:
+        # Add progress for the last 7 days
+        for d in range(7):
+            progress_date = today - timedelta(days=d)
+            
+            # Randomly complete some goals
+            is_completed = random.random() < 0.6  # 60% completion rate
+            
+            progress = GoalProgress(
+                goal_id=goal.id,
+                date=progress_date,
+                current_value=random.uniform(goal.target_value * 0.3, goal.target_value * 0.9),
+                is_completed=is_completed,
+                notes=f"Progress update for {progress_date.isoformat()}"
+            )
+            session.add(progress)
 
 
 def seed_records(session: Session, user: User) -> None:
@@ -136,6 +197,7 @@ def main() -> None:
     try:
         user = get_or_create_user(session, email="demo@example.com", name="Demo User", password="demo1234")
         seed_articles(session)
+        seed_goals(session, user)
         seed_records(session, user)
         session.commit()
         print("Seed completed. User email=demo@example.com, password=demo1234")

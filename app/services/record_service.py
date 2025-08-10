@@ -1,184 +1,334 @@
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
 
 from app.repositories import record_repository
-from app.schemas.common import Page, PageMeta, Pagination
-from app.schemas.records import (
-    BodyRecordCreate,
-    BodyRecordRead,
-    MealCreate,
-    MealRead,
-    ExerciseCreate,
-    ExerciseRead,
-    DiaryCreate,
-    DiaryRead,
-)
+from app.schemas.common import Pagination
 
 
-def list_body_records(
-    session: Session,
-    user_id: int,
-    *,
-    limit: int | None = None,
-    offset: int = 0,
-    date_from=None,
-    date_to=None,
-) -> Page:
-    records = record_repository.list_body_records_by_user(
-        session, user_id, limit=limit, offset=offset, date_from=date_from, date_to=date_to
-    )
-    total = record_repository.count_body_records_by_user(session, user_id, date_from=date_from, date_to=date_to)
-    return Pagination(
-        data=[BodyRecordRead.model_validate(r) for r in records],
-        previous="",
-        next="",
-        count=total,
-    )
+class BaseRecordService:
+    def __init__(self, repository_module):
+        self.repository = repository_module
+
+    def list_records(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = self.repository.list_records_by_user(
+            session, user_id, limit=limit, offset=offset, **filters
+        )
+        total = self.repository.count_records_by_user(session, user_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, user_id: int, data: dict):
+        return self.repository.create_record(session, user_id=user_id, data=data)
+
+    def get_record(self, session: Session, user_id: int, record_id: int):
+        return self.repository.get_record_by_id(session, user_id, record_id)
+
+    def update_record(self, session: Session, user_id: int, record_id: int, data: dict):
+        record = self.repository.get_record_by_id(session, user_id, record_id)
+        if not record:
+            return None
+        return self.repository.update_record(session, record, data)
+
+    def delete_record(self, session: Session, user_id: int, record_id: int) -> bool:
+        record = self.repository.get_record_by_id(session, user_id, record_id)
+        if not record:
+            return False
+        self.repository.delete_record(session, record)
+        return True
 
 
-def create_body_record(session: Session, user_id: int, payload: BodyRecordCreate) -> BodyRecordRead:
-    record = record_repository.create_body_record(session, user_id=user_id, data=payload.model_dump())
-    return BodyRecordRead.model_validate(record)
+class GoalService(BaseRecordService):
+    def __init__(self):
+        super().__init__(record_repository)
+
+    def list_records(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = record_repository.list_goals_by_user(
+            session, user_id, limit=limit, offset=offset, **filters
+        )
+        total = record_repository.count_goals_by_user(session, user_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, user_id: int, data: dict):
+        return record_repository.create_goal(session, user_id=user_id, data=data)
+
+    def get_record(self, session: Session, user_id: int, record_id: int):
+        return record_repository.get_goal_by_id(session, user_id, record_id)
+
+    def update_record(self, session: Session, user_id: int, record_id: int, data: dict):
+        record = record_repository.get_goal_by_id(session, user_id, record_id)
+        if not record:
+            return None
+        return record_repository.update_goal(session, record, data)
+
+    def delete_record(self, session: Session, user_id: int, record_id: int) -> bool:
+        record = record_repository.get_goal_by_id(session, user_id, record_id)
+        if not record:
+            return False
+        record_repository.delete_goal(session, record)
+        return True
 
 
-def list_meals(
-    session: Session,
-    user_id: int,
-    *,
-    limit: int | None = None,
-    offset: int = 0,
-    date_from=None,
-    date_to=None,
-    meal_type: str | None = None,
-) -> Page:
-    items = record_repository.list_meals_by_user(
-        session, user_id, limit=limit, offset=offset, date_from=date_from, date_to=date_to, meal_type=meal_type
-    )
-    total = record_repository.count_meals_by_user(session, user_id, date_from=date_from, date_to=date_to, meal_type=meal_type)
-    return Pagination(
-        data=[MealRead.model_validate(i) for i in items],
-        previous="",
-        next="",
-        count=total,
-    )
+class GoalProgressService(BaseRecordService):
+    def __init__(self):
+        super().__init__(record_repository)
+
+    def list_records(
+        self,
+        session: Session,
+        goal_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = record_repository.list_goal_progress_by_goal(
+            session, goal_id, limit=limit, offset=offset, **filters
+        )
+        total = record_repository.count_goal_progress_by_goal(session, goal_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, goal_id: int, data: dict):
+        return record_repository.create_goal_progress(session, goal_id=goal_id, data=data)
+
+    def get_record(self, session: Session, goal_id: int, record_id: int):
+        return record_repository.get_goal_progress_by_id(session, goal_id, record_id)
+
+    def update_record(self, session: Session, goal_id: int, record_id: int, data: dict):
+        record = record_repository.get_goal_progress_by_id(session, goal_id, record_id)
+        if not record:
+            return None
+        return record_repository.update_goal_progress(session, record, data)
+
+    def delete_record(self, session: Session, goal_id: int, record_id: int) -> bool:
+        record = record_repository.get_goal_progress_by_id(session, goal_id, record_id)
+        if not record:
+            return False
+        record_repository.delete_goal_progress(session, record)
+        return True
 
 
-def create_meal(session: Session, user_id: int, payload: MealCreate) -> MealRead:
-    item = record_repository.create_meal(session, user_id=user_id, data=payload.model_dump())
-    return MealRead.model_validate(item)
+class BodyRecordService(BaseRecordService):
+    def __init__(self):
+        super().__init__(record_repository)
+
+    def list_records(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = record_repository.list_body_records_by_user(
+            session, user_id, limit=limit, offset=offset, **filters
+        )
+        total = record_repository.count_body_records_by_user(session, user_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, user_id: int, data: dict):
+        return record_repository.create_body_record(session, user_id=user_id, data=data)
+
+    def get_record(self, session: Session, user_id: int, record_id: int):
+        return record_repository.get_body_record_by_id(session, user_id, record_id)
+
+    def update_record(self, session: Session, user_id: int, record_id: int, data: dict):
+        record = record_repository.get_body_record_by_id(session, user_id, record_id)
+        if not record:
+            return None
+        return record_repository.update_body_record(session, record, data)
+
+    def delete_record(self, session: Session, user_id: int, record_id: int) -> bool:
+        record = record_repository.get_body_record_by_id(session, user_id, record_id)
+        if not record:
+            return False
+        record_repository.delete_body_record(session, record)
+        return True
 
 
-def list_exercises(
-    session: Session,
-    user_id: int,
-    *,
-    limit: int | None = None,
-    offset: int = 0,
-    date_from=None,
-    date_to=None,
-) -> Page:
-    items = record_repository.list_exercises_by_user(
-        session, user_id, limit=limit, offset=offset, date_from=date_from, date_to=date_to
-    )
-    total = record_repository.count_exercises_by_user(session, user_id, date_from=date_from, date_to=date_to)
-    return Pagination(
-        data=[ExerciseRead.model_validate(i) for i in items],
-        previous="",
-        next="",
-        count=total,
-    )
+class MealService(BaseRecordService):
+    def __init__(self):
+        super().__init__(record_repository)
+
+    def list_records(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = record_repository.list_meals_by_user(
+            session, user_id, limit=limit, offset=offset, **filters
+        )
+        total = record_repository.count_meals_by_user(session, user_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, user_id: int, data: dict):
+        return record_repository.create_meal(session, user_id=user_id, data=data)
+
+    def get_record(self, session: Session, user_id: int, record_id: int):
+        return record_repository.get_meal_by_id(session, user_id, record_id)
+
+    def update_record(self, session: Session, user_id: int, record_id: int, data: dict):
+        record = record_repository.get_meal_by_id(session, user_id, record_id)
+        if not record:
+            return None
+        return record_repository.update_meal(session, record, data)
+
+    def delete_record(self, session: Session, user_id: int, record_id: int) -> bool:
+        record = record_repository.get_meal_by_id(session, user_id, record_id)
+        if not record:
+            return False
+        record_repository.delete_meal(session, record)
+        return True
 
 
-def create_exercise(session: Session, user_id: int, payload: ExerciseCreate) -> ExerciseRead:
-    item = record_repository.create_exercise(session, user_id=user_id, data=payload.model_dump())
-    return ExerciseRead.model_validate(item)
+class ExerciseService(BaseRecordService):
+    def __init__(self):
+        super().__init__(record_repository)
+
+    def list_records(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = record_repository.list_exercises_by_user(
+            session, user_id, limit=limit, offset=offset, **filters
+        )
+        total = record_repository.count_exercises_by_user(session, user_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, user_id: int, data: dict):
+        return record_repository.create_exercise(session, user_id=user_id, data=data)
+
+    def get_record(self, session: Session, user_id: int, record_id: int):
+        return record_repository.get_exercise_by_id(session, user_id, record_id)
+
+    def update_record(self, session: Session, user_id: int, record_id: int, data: dict):
+        record = record_repository.get_exercise_by_id(session, user_id, record_id)
+        if not record:
+            return None
+        return record_repository.update_exercise(session, record, data)
+
+    def delete_record(self, session: Session, user_id: int, record_id: int) -> bool:
+        record = record_repository.get_exercise_by_id(session, user_id, record_id)
+        if not record:
+            return False
+        record_repository.delete_exercise(session, record)
+        return True
 
 
-def list_diaries(
-    session: Session,
-    user_id: int,
-    *,
-    limit: int | None = None,
-    offset: int = 0,
-    date_from=None,
-    date_to=None,
-) -> Page:
-    items = record_repository.list_diaries_by_user(
-        session, user_id, limit=limit, offset=offset, date_from=date_from, date_to=date_to
-    )
-    total = record_repository.count_diaries_by_user(session, user_id, date_from=date_from, date_to=date_to)
-    return Pagination(
-        data=[DiaryRead.model_validate(i) for i in items],
-        previous="",
-        next="",
-        count=total,
-    )
+class DiaryService(BaseRecordService):
+    def __init__(self):
+        super().__init__(record_repository)
+
+    def list_records(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+        **filters
+    ) -> Pagination:
+        records = record_repository.list_diaries_by_user(
+            session, user_id, limit=limit, offset=offset, **filters
+        )
+        total = record_repository.count_diaries_by_user(session, user_id, **filters)
+        
+        return Pagination(
+            data=records,
+            count=total,
+            previous=f"?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else "",
+            next=f"?limit={limit}&offset={offset + limit}" if offset + limit < total else ""
+        )
+
+    def create_record(self, session: Session, user_id: int, data: dict):
+        return record_repository.create_diary(session, user_id=user_id, data=data)
+
+    def get_record(self, session: Session, user_id: int, record_id: int):
+        return record_repository.get_diary_by_id(session, user_id, record_id)
+
+    def update_record(self, session: Session, user_id: int, record_id: int, data: dict):
+        record = record_repository.get_diary_by_id(session, user_id, record_id)
+        if not record:
+            return None
+        return record_repository.update_diary(session, record, data)
+
+    def delete_record(self, session: Session, user_id: int, record_id: int) -> bool:
+        record = record_repository.get_diary_by_id(session, user_id, record_id)
+        if not record:
+            return False
+        record_repository.delete_diary(session, record)
+        return True
 
 
-def update_body_record(session: Session, user_id: int, record_id: int, data: dict) -> BodyRecordRead:
-    obj = record_repository.get_body_record_by_id(session, user_id, record_id)
-    if obj is None:
-        raise ValueError("Record not found")
-    obj = record_repository.update_body_record(session, obj, data)
-    return BodyRecordRead.model_validate(obj)
-
-
-def delete_body_record(session: Session, user_id: int, record_id: int) -> None:
-    obj = record_repository.get_body_record_by_id(session, user_id, record_id)
-    if obj is None:
-        raise ValueError("Record not found")
-    record_repository.delete_body_record(session, obj)
-
-
-def update_meal(session: Session, user_id: int, meal_id: int, data: dict) -> MealRead:
-    obj = record_repository.get_meal_by_id(session, user_id, meal_id)
-    if obj is None:
-        raise ValueError("Meal not found")
-    obj = record_repository.update_meal(session, obj, data)
-    return MealRead.model_validate(obj)
-
-
-def delete_meal(session: Session, user_id: int, meal_id: int) -> None:
-    obj = record_repository.get_meal_by_id(session, user_id, meal_id)
-    if obj is None:
-        raise ValueError("Meal not found")
-    record_repository.delete_meal(session, obj)
-
-
-def update_exercise(session: Session, user_id: int, exercise_id: int, data: dict) -> ExerciseRead:
-    obj = record_repository.get_exercise_by_id(session, user_id, exercise_id)
-    if obj is None:
-        raise ValueError("Exercise not found")
-    obj = record_repository.update_exercise(session, obj, data)
-    return ExerciseRead.model_validate(obj)
-
-
-def delete_exercise(session: Session, user_id: int, exercise_id: int) -> None:
-    obj = record_repository.get_exercise_by_id(session, user_id, exercise_id)
-    if obj is None:
-        raise ValueError("Exercise not found")
-    record_repository.delete_exercise(session, obj)
-
-
-def update_diary(session: Session, user_id: int, diary_id: int, data: dict) -> DiaryRead:
-    obj = record_repository.get_diary_by_id(session, user_id, diary_id)
-    if obj is None:
-        raise ValueError("Diary not found")
-    obj = record_repository.update_diary(session, obj, data)
-    return DiaryRead.model_validate(obj)
-
-
-def delete_diary(session: Session, user_id: int, diary_id: int) -> None:
-    obj = record_repository.get_diary_by_id(session, user_id, diary_id)
-    if obj is None:
-        raise ValueError("Diary not found")
-    record_repository.delete_diary(session, obj)
-
-
-def create_diary(session: Session, user_id: int, payload: DiaryCreate) -> DiaryRead:
-    item = record_repository.create_diary(session, user_id=user_id, data=payload.model_dump())
-    return DiaryRead.model_validate(item)
+# Service instances
+body_record_service = BodyRecordService()
+meal_service = MealService()
+exercise_service = ExerciseService()
+diary_service = DiaryService()
+goal_service = GoalService()
+goal_progress_service = GoalProgressService()
 
 

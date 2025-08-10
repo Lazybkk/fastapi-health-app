@@ -5,7 +5,7 @@ from typing import List
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from app.models.record import BodyRecord, Meal, Exercise, Diary
+from app.models.record import BodyRecord, Meal, Exercise, Diary, Goal, GoalProgress
 from app.schemas.enums import MealType
 
 
@@ -58,6 +58,125 @@ def update_body_record(session: Session, obj: BodyRecord, data: dict) -> BodyRec
 
 def delete_body_record(session: Session, obj: BodyRecord) -> None:
     session.delete(obj)
+
+
+# Goal
+def list_goals_by_user(
+    session: Session,
+    user_id: int,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    is_active: bool | None = None,
+) -> List[Goal]:
+    stmt = select(Goal).where(Goal.user_id == user_id)
+    if is_active is not None:
+        stmt = stmt.where(Goal.is_active == is_active)
+    stmt = stmt.order_by(Goal.created_at.desc()).limit(limit).offset(offset)
+    return session.scalars(stmt).all()
+
+
+def count_goals_by_user(session: Session, user_id: int, *, is_active: bool | None = None) -> int:
+    stmt = select(func.count()).select_from(Goal).where(Goal.user_id == user_id)
+    if is_active is not None:
+        stmt = stmt.where(Goal.is_active == is_active)
+    return session.execute(stmt).scalar_one()
+
+
+def create_goal(session: Session, *, user_id: int, data: dict) -> Goal:
+    goal = Goal(user_id=user_id, **data)
+    session.add(goal)
+    session.flush()
+    return goal
+
+
+def get_goal_by_id(session: Session, user_id: int, goal_id: int) -> Goal | None:
+    obj = session.get(Goal, goal_id)
+    return obj if obj and obj.user_id == user_id else None
+
+
+def update_goal(session: Session, obj: Goal, data: dict) -> Goal:
+    for k, v in data.items():
+        setattr(obj, k, v)
+    session.flush()
+    return obj
+
+
+def delete_goal(session: Session, obj: Goal) -> None:
+    session.delete(obj)
+
+
+# GoalProgress
+def list_goal_progress_by_goal(
+    session: Session,
+    goal_id: int,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    date_from=None,
+    date_to=None,
+) -> List[GoalProgress]:
+    stmt = select(GoalProgress).where(GoalProgress.goal_id == goal_id)
+    if date_from is not None:
+        stmt = stmt.where(GoalProgress.date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(GoalProgress.date <= date_to)
+    stmt = stmt.order_by(GoalProgress.date.desc()).limit(limit).offset(offset)
+    return session.scalars(stmt).all()
+
+
+def count_goal_progress_by_goal(session: Session, goal_id: int, *, date_from=None, date_to=None) -> int:
+    stmt = select(func.count()).select_from(GoalProgress).where(GoalProgress.goal_id == goal_id)
+    if date_from is not None:
+        stmt = stmt.where(GoalProgress.date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(GoalProgress.date <= date_to)
+    return session.execute(stmt).scalar_one()
+
+
+def create_goal_progress(session: Session, *, goal_id: int, data: dict) -> GoalProgress:
+    progress = GoalProgress(goal_id=goal_id, **data)
+    session.add(progress)
+    session.flush()
+    return progress
+
+
+def get_goal_progress_by_id(session: Session, goal_id: int, progress_id: int) -> GoalProgress | None:
+    obj = session.get(GoalProgress, progress_id)
+    return obj if obj and obj.goal_id == goal_id else None
+
+
+def update_goal_progress(session: Session, obj: GoalProgress, data: dict) -> GoalProgress:
+    for k, v in data.items():
+        setattr(obj, k, v)
+    session.flush()
+    return obj
+
+
+def delete_goal_progress(session: Session, obj: GoalProgress) -> None:
+    session.delete(obj)
+
+
+def count_completed_goals_by_user(session: Session, user_id: int, *, date_from=None, date_to=None) -> int:
+    """Count distinct goals that have been completed within a date range"""
+    stmt = select(func.count(func.distinct(Goal.id))).select_from(GoalProgress).join(Goal).where(
+        Goal.user_id == user_id,
+        GoalProgress.is_completed == True
+    )
+    if date_from is not None:
+        stmt = stmt.where(GoalProgress.date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(GoalProgress.date <= date_to)
+    return session.execute(stmt).scalar_one()
+
+
+def count_total_goals_by_user(session: Session, user_id: int) -> int:
+    """Count total active goals for a user"""
+    stmt = select(func.count()).select_from(Goal).where(
+        Goal.user_id == user_id,
+        Goal.is_active == True
+    )
+    return session.execute(stmt).scalar_one()
 
 
 # Meal

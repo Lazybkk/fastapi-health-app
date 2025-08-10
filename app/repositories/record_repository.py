@@ -220,19 +220,36 @@ def delete_diary(session: Session, obj: Diary) -> None:
 
 def count_record_days_in_range(session: Session, user_id: int, start_date, end_date) -> int:
     # Count distinct dates in any of the record tables for the user within the range
-    # Optimize later if needed; for now, use BodyRecord as a proxy of activity
-    return (
-        session.execute(
-            select(BodyRecord.date)
-            .where(
-                BodyRecord.user_id == user_id,
-                BodyRecord.date >= start_date,
-                BodyRecord.date <= end_date,
-            )
-            .distinct()
-        )
-        .all()
-        .__len__()
+    from sqlalchemy import union
+    
+    # Get all distinct dates from all record types
+    body_dates = select(BodyRecord.date).where(
+        BodyRecord.user_id == user_id,
+        BodyRecord.date >= start_date,
+        BodyRecord.date <= end_date,
     )
+    
+    meal_dates = select(Meal.date).where(
+        Meal.user_id == user_id,
+        Meal.date >= start_date,
+        Meal.date <= end_date,
+    )
+    
+    exercise_dates = select(Exercise.date).where(
+        Exercise.user_id == user_id,
+        Exercise.date >= start_date,
+        Exercise.date <= end_date,
+    )
+    
+    diary_dates = select(Diary.date).where(
+        Diary.user_id == user_id,
+        Diary.date >= start_date,
+        Diary.date <= end_date,
+    )
+    
+    # Union all dates and count distinct
+    all_dates = union(body_dates, meal_dates, exercise_dates, diary_dates).subquery()
+    result = session.execute(select(func.count()).select_from(all_dates)).scalar_one()
+    return result or 0
 
 

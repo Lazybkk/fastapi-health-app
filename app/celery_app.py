@@ -17,6 +17,10 @@ def ping() -> str:
     return "pong"
 
 
+# Import tasks to register them
+from app.tasks import stats_tasks, article_tasks
+
+
 # Celery Beat schedule
 celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {

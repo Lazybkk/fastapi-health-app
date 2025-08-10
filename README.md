@@ -5,6 +5,7 @@ Backend for a health-tracking web app (coding exercise) with pages: Top, My Reco
 ### Overview
 - Provide APIs for body weight/body-fat, meals, exercises, and diaries (private area – JWT)
 - Public health articles API with Redis cache and filters by category/tag/search
+- Achievement rate calculation and tracking with automatic triggers
 - Background jobs via Celery (cache warmup, daily achievement-rate computation), monitored by Flower
 
 ### Tech Stack
@@ -20,7 +21,7 @@ Backend for a health-tracking web app (coding exercise) with pages: Top, My Reco
   - Router: declares endpoints and maps request/response schemas
   - Service: business logic; orchestrates repositories/cache/tasks
   - Repository: database access with SQLAlchemy (Core/ORM)
-- Redis caches article lists
+- Redis caches article lists and achievement rates
 - Celery worker for background work; Celery beat for schedules; Flower for monitoring
 
 ```
@@ -33,6 +34,12 @@ graph TD
   W[Celery Worker] --> PG
   W --> R
   F[Flower] --> WQ
+  
+  subgraph "Achievement Rate"
+    AR[Record Creation] -->|Trigger| WQ
+    W -->|Calculate| AR_CALC[Achievement Rate]
+    AR_CALC -->|Cache| R
+  end
 ```
 
 ### ERD
@@ -130,7 +137,7 @@ docker compose exec -T web bash -lc 'PYTHONPATH=/app python scripts/seed_data.py
 
 Services:
 - API: `http://localhost:8000` (docs: `http://localhost:8000/docs`)
-- Flower: `http://localhost:5555`
+- Flower: `http://localhost:5555` (Celery monitoring)
 
 Demo account:
 - email: `demo@example.com`
@@ -176,6 +183,42 @@ Object.entries(presign.fields).forEach(([k, v]) => fd.append(k, v));
 fd.append('file', file);
 await fetch(presign.url, { method: 'POST', body: fd });
 // then submit image_url: presign.public_url to your API
+```
+
+## Achievement Rate System
+
+### Calculation
+- **Formula**: `(days_with_records / total_days) × 100%`
+- **Window**: Configurable (default: 30 days)
+- **Record types**: Body records, meals, exercises, diaries
+- **Cache**: Redis (1 hour TTL)
+
+### APIs
+- `GET /stats/achievement-rate` - Current user's achievement rate
+- `GET /stats/achievement-rate/user/{user_id}` - Specific user (admin)
+- `POST /stats/achievement-rate/trigger` - Manual calculation trigger
+
+### Automatic Triggers
+- ✅ When creating new body records
+- ✅ When creating new meals
+- ✅ When creating new exercises  
+- ✅ When creating new diaries
+
+### Background Tasks
+- **Daily**: `stats.compute_achievement_rate_all_users` (3:00 AM UTC)
+- **On-demand**: `stats.compute_achievement_rate` (per user)
+- **Monitor**: Flower dashboard at `http://localhost:5555`
+
+### Example Usage
+```bash
+# Get current user achievement rate
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/stats/achievement-rate
+
+# Get specific user with custom window
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8000/stats/achievement-rate/user/1?window_days=7"
+
+# Trigger calculation for all users
+curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8000/stats/achievement-rate/trigger
 ```
 
 ## Notes

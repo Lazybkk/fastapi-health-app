@@ -23,6 +23,7 @@ from app.schemas.records import (
 )
 from app.schemas.common import Pagination
 from app.services import record_service
+from app.tasks.stats_tasks import compute_achievement_rate_task
 
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
@@ -54,7 +55,10 @@ def create_body_record(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return record_service.create_body_record(session, current_user.id, payload)
+    result = record_service.create_body_record(session, current_user.id, payload)
+    # Trigger achievement rate calculation
+    compute_achievement_rate_task.delay(current_user.id)
+    return result
 
 
 @router.patch("/body-records/{record_id}", response_model=BodyRecordRead)
@@ -114,7 +118,10 @@ def create_meal(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return record_service.create_meal(session, current_user.id, payload)
+    result = record_service.create_meal(session, current_user.id, payload)
+    # Trigger achievement rate calculation
+    compute_achievement_rate_task.delay(current_user.id)
+    return result
 
 
 @router.patch("/meals/{meal_id}", response_model=MealRead)
@@ -172,7 +179,10 @@ def create_exercise(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return record_service.create_exercise(session, current_user.id, payload)
+    result = record_service.create_exercise(session, current_user.id, payload)
+    # Trigger achievement rate calculation
+    compute_achievement_rate_task.delay(current_user.id)
+    return result
 
 
 @router.patch("/exercises/{exercise_id}", response_model=ExerciseRead)
@@ -230,7 +240,10 @@ def create_diary(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return record_service.create_diary(session, current_user.id, payload)
+    result = record_service.create_diary(session, current_user.id, payload)
+    # Trigger achievement rate calculation
+    compute_achievement_rate_task.delay(current_user.id)
+    return result
 
 
 @router.patch("/diaries/{diary_id}", response_model=DiaryRead)

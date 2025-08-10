@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.2-alpine
+
+  web:
+    build: .
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  worker:
+    build: .
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    command: ["bash", "-lc", "celery -A app.celery_app.celery_app worker -l info"]
+    volumes:
+      - .:/app
+
+  beat:
+    build: .
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    command: ["bash", "-lc", "celery -A app.celery_app.celery_app beat -l info"]
+    volumes:
+      - .:/app
+
+  flower:
+    build: .
+    depends_on:
+      - redis
+      - worker
+    env_file:
+      - .env
+    command: ["bash", "-lc", "celery -A app.celery_app.celery_app flower --port=5555"]
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+
+volumes:
+  pgdata:
+

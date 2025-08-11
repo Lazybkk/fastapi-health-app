@@ -29,8 +29,8 @@ class BodyRecordUpdate(BaseModel):
 class BodyRecordRead(BodyRecordBase):
     id: int
     user_id: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class GoalBase(BaseModel):
@@ -135,8 +135,8 @@ class MealUpdate(BaseModel):
 class MealRead(MealBase):
     id: int
     user_id: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class ExerciseBase(BaseModel):
@@ -164,8 +164,8 @@ class ExerciseUpdate(BaseModel):
 class ExerciseRead(ExerciseBase):
     id: int
     user_id: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class DiaryBase(BaseModel):
@@ -191,7 +191,7 @@ class DiaryUpdate(BaseModel):
 class DiaryRead(DiaryBase):
     id: int
     user_id: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 
